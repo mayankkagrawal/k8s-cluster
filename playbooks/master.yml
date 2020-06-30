@@ -1,0 +1,22 @@
+- hosts: kubernetes-master-nodes
+  vars_files:
+          - env_variables
+  tasks:
+       - name: "initialise kubeadm"
+         shell: kubeadm init  --pod-network-cidr="{{ cidr }}"
+         register: output
+       - name: "Storing Logs and Generated token for future purpose."
+         local_action: copy content={{ output.stdout }} dest={{ token_file }}
+         sudo: False  
+       - name: "create a file for kube"
+         file:
+                  path: /root/.kube/config
+                  state: touch
+       - name: "Copying required files"
+         shell: |
+                 mkdir -p $HOME/.kube
+                 sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
+                 sudo chown $(id -u):$(id -g) $HOME/.kube/config
+       - name: "flannel"
+         command:
+           cmd: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml 

@@ -1,0 +1,7 @@
+[kubernetes-master-nodes]
+localhost
+
+
+[kubernetes-worker-nodes]
+192.168.43.224
+

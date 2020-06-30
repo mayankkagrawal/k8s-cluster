@@ -1,0 +1,118 @@
+- hosts: all
+  vars_files:
+        - env_variables
+  tasks:
+          - name: "create a dvd1 folder"
+            file:
+                  path: /dvd1
+                  state: directory
+          - name: "create a rhel file"
+            file:
+                  path: /etc/yum.repos.d/rhel.repo
+                  state: touch
+
+          - name: "mount /dvd1 folder to /dev/cdrom"
+            command:
+                  cmd: "mount /dev/cdrom /dvd1"
+            ignore_errors: yes
+          - name: "create a yum"
+            blockinfile:
+                  path: /etc/yum.repos.d/rhel.repo
+                  block: |
+                   [rhel]
+                   baseurl=file:///dvd1/AppStream
+                   gpgcheck=0
+                   [rhel1]
+                   baseurl=file:///dvd1/BaseOS
+                   gpgcheck=0
+            ignore_errors: yes
+          - name: "permanent mount"
+            shell: "echo -e -n 'mount /dev/cdrom /dvd1'>> /etc/rc.d/rc.local"
+            ignore_errors: yes
+          - name: "making executable of /dvd1"
+            command:
+              cmd: chmod +x /etc/rc.d/rc.local
+            ignore_errors: yes
+          - name: "install pip"
+            yum: 
+               name: "python3-pip"
+               state: present
+          - name: "install ansible"
+            pip: 
+               name: ansible
+               state: present
+            ignore_errors: yes
+          - name: "create a file for docker"
+            file:
+                  path: /etc/yum.repos.d/docker.repo
+                  state: touch
+          - name: "create docker repo"
+            blockinfile:
+                  path: /etc/yum.repos.d/docker.repo
+                  block: | 
+                   [docker]
+                   baseurl=https://download.docker.com/linux/centos/7/x86_64/stable/
+                   gpgcheck=0
+            ignore_errors: yes
+          - name: "install docker"
+            command:
+                cmd: yum install docker-ce -y --nobest
+            ignore_errors: yes
+          - name: "copy kubernetes repo"
+            copy:
+                  src: kubernetes.repo
+                  dest: /etc/yum.repos.d/kubernetes.repo
+            ignore_errors: yes
+          - name: "start and enabled docker service"
+            service:
+                    name: docker
+                    state: started
+                    enabled: yes
+            ignore_errors: yes
+          - name: "stop firewalld"
+            service:
+                    name: firewalld
+                    state: stopped
+            ignore_errors: yes
+
+          - name: "install kubeadm, kubelet,kubectl"
+            command:
+                cmd: yum install kubeadm kubelet kubectl -y --disableexcludes=kubernetes
+            ignore_errors: yes
+          - name: "start the kubelet service"
+            service:
+                    name: kubelet
+                    state: started
+                    enabled: yes
+            ignore_errors: yes 
+          - name: "Ensure SELinux is set to enforcing mode"
+            lineinfile:
+                path: /etc/selinux/config
+                regexp: '^SELINUX='
+                line: SELINUX=permissive
+            ignore_errors: yes 
+          - name: "Commenting Swap entries in /etc/fstab"
+            replace:
+                 path: /etc/fstab
+                 regexp: '(^/.*swap*)'
+                 replace: '# \1'
+            ignore_errors: yes 
+          - name: "ip route -tc"
+            command:
+                    cmd: yum install iproute-tc -y
+          - name: "create a file for daemon"
+            file:
+                  path: /etc/docker/daemon.json
+                  state: touch
+          - name: "cgroup driver" 
+            copy:
+                    src: daemon.json
+                    dest: /etc/docker/daemon.json
+            ignore_errors: yes 
+          - name: "daemon-reload" 
+            command:
+                     cmd: systemctl daemon-reload
+          - name: "restart docker service" 
+            service:
+                     name: docker
+                     state: restarted          
